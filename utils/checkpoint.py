@@ -10,7 +10,9 @@ import re
 from collections import defaultdict
 
 import torch
-from mmcv.runner import CheckpointLoader
+# from mmcv.runner import CheckpointLoader # <2.0.0
+from mmengine.runner import CheckpointLoader
+from mmengine.logging import print_log
 from omegaconf import read_write
 from torch.nn.parallel.distributed import DistributedDataParallel
 
@@ -30,15 +32,16 @@ def check_whitelist(key, whitelist):
 
 def load_checkpoint(config, model, optimizer, lr_scheduler, scaler):
     logger = get_logger()
-    logger.info(f"==============> Resuming form {config.checkpoint.resume}....................")
+    print_log(f"==============> Resuming form {config.checkpoint.resume}....................", logger=logger)
+    #logger.info(f"==============> Resuming form {config.checkpoint.resume}....................")
     checkpoint = CheckpointLoader.load_checkpoint(config.checkpoint.resume, map_location="cpu")
     msg = model.load_state_dict(checkpoint["model"], strict=False)
     whitelist_cnt = 0
 
     if msg.missing_keys or msg.unexpected_keys:
-        logger.info("#" * 80)
+        print_log("#" * 80, logger)
         if msg.missing_keys:
-            logger.info("!!! Missing keys !!!")
+            print_log("!!! Missing keys !!!", logger=logger)
             for key in msg.missing_keys:
                 if check_whitelist(key, missing_keys_whitelist):
                     whitelist_cnt += 1
@@ -46,18 +49,18 @@ def load_checkpoint(config, model, optimizer, lr_scheduler, scaler):
 
                 logger.info(f"\t {key}")
 
-            logger.info(f"Whitelist of missing keys: {missing_keys_whitelist}")
-            logger.info(f"# of Whitelisted missing keys = {whitelist_cnt}")
+            print_log(f"Whitelist of missing keys: {missing_keys_whitelist}", logger)
+            print_log(f"# of Whitelisted missing keys = {whitelist_cnt}", logger)
             if len(msg.missing_keys) > whitelist_cnt:
                 logger.warning("Please check the missing keys.")
 
         if msg.unexpected_keys:
-            logger.info("!!! Unexpected keys !!!")
+            print_log("!!! Unexpected keys !!!", logger=logger)
             for key in msg.unexpected_keys:
-                logger.info(f"\t {key}")
+                print_log(f"\t {key}", logger=logger)
 
             raise ValueError("Unexpected keys are found in the checkpoint.")
-        logger.info("#" * 80)
+        print_log("#" * 80, logger)
 
     metrics = defaultdict(float)
     is_resume = (
@@ -72,8 +75,8 @@ def load_checkpoint(config, model, optimizer, lr_scheduler, scaler):
         with read_write(config):
             config.train.start_step = checkpoint["step"] + 1
         scaler.load_state_dict(checkpoint["scaler"])
-        logger.info(
-            f"=> loaded successfully '{config.checkpoint.resume}' (step {checkpoint['step']})"
+        print_log(
+            f"=> loaded successfully '{config.checkpoint.resume}' (step {checkpoint['step']})", logger=logger
         )
         default_metrics = {"max_accuracy": 0.0, "max_voc_miou": 0.0, "max_context_miou": 0.0}
         metrics = checkpoint.get("metrics", default_metrics)

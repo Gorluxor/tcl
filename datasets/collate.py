@@ -16,7 +16,8 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data.dataloader import default_collate
 
-from mmcv.parallel.data_container import DataContainer
+#from mmcv.parallel.data_container import DataContainer
+from mmengine.dataset.utils import BaseDataElement as DataContainer
 
 
 def collate(batch, samples_per_gpu=1):
